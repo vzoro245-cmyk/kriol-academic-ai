@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Usuários: Permite ler e atualizar perfil e créditos
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      // Permite atualização de qualquer campo para o próprio usuário (incluindo créditos via transação no client)
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // Códigos de recarga: Permite ler e marcar como usado
+    match /credit_codes/{codeId} {
+      allow read: if request.auth != null;
+      // A regra de update deve ser flexível o suficiente para os campos enviados na transação
+      allow update: if request.auth != null
+                    && resource.data.status == "available"
+                    && request.resource.data.status == "used"
+                    && request.resource.data.usedBy == request.auth.uid;
+      allow create, delete: if false;
+    }
+
+    // Transações de créditos (Histórico)
+    match /credit_transactions/{transactionId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Pacotes de créditos: Leitura pública para usuários autenticados
+    match /credit_packages/{packageId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Trabalhos gerados
+    match /works/{workId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // Configurações globais
+    match /settings/{doc} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

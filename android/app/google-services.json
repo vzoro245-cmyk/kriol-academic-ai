@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "724400799431",
+    "project_id": "kriol-academic-ai",
+    "storage_bucket": "kriol-academic-ai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:724400799431:android:b7727f3825ec0f767808e2",
+        "android_client_info": {
+          "package_name": "com.example.kriol_academic_ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKBjajcRQ833ZnJ417IUdH8OkPZx4fvcY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
