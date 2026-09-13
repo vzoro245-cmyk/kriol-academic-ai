@@ -156,7 +156,7 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
 
     setState(() {
       _isLoading = true;
-      _loadingMessage = 'Gerando conteúdo com Gemini...';
+      _loadingMessage = 'Gerando conteúdo...';
     });
 
     try {
@@ -642,7 +642,7 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
         DropdownButtonFormField<String>(
           initialValue: _selectedLanguage,
           decoration: const InputDecoration(labelText: 'Idioma', border: OutlineInputBorder()),
-          items: ['Português', 'Inglês', 'Francês', 'Crioulo'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          items: ['Português', 'Inglês', 'Francês'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
           onChanged: (v) => setState(() => _selectedLanguage = v!),
         ),
         const SizedBox(height: 12),
