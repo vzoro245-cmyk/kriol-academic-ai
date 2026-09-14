@@ -62,7 +62,10 @@ class AcademicWork {
   final List<String> abntSections;
   final String? fileName;
   final String? localPath;
+  final String? localUri; // Novo campo para URI do SAF
   final String? fileUrl;
+  final String? norm; // ABNT, APA, NORMAL
+  final DateTime? savedAt;
 
   AcademicWork({
     required this.id,
@@ -91,7 +94,10 @@ class AcademicWork {
     this.abntSections = const [],
     this.fileName,
     this.localPath,
+    this.localUri,
     this.fileUrl,
+    this.norm,
+    this.savedAt,
   });
 
   factory AcademicWork.fromFirestore(DocumentSnapshot doc) {
@@ -126,7 +132,10 @@ class AcademicWork {
       abntSections: List<String>.from(data['abntSections'] ?? []),
       fileName: data['fileName'],
       localPath: data['localPath'],
+      localUri: data['localUri'],
       fileUrl: data['fileUrl'],
+      norm: data['norm'],
+      savedAt: (data['savedAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -140,10 +149,10 @@ class AcademicWork {
       'type': type,
       'level': level,
       'language': language,
-      'pageCount': pageCount,
+      'pages': pageCount, // Usando 'pages' conforme solicitado
       'content': content,
       'status': status.name,
-      'createdAt': createdAt, // Use specific date or server timestamp
+      'createdAt': createdAt,
       'costInCredits': costInCredits,
       'course': course,
       'studentClass': studentClass,
@@ -157,15 +166,21 @@ class AcademicWork {
       'abntSections': abntSections,
       'fileName': fileName,
       'localPath': localPath,
+      'localUri': localUri,
       'fileUrl': fileUrl,
+      'norm': norm,
+      'savedAt': savedAt != null ? Timestamp.fromDate(savedAt!) : null,
     };
   }
 
   AcademicWork copyWith({
     WorkStatus? status,
     String? localPath,
+    String? localUri,
     String? fileName,
     String? fileUrl,
+    String? norm,
+    DateTime? savedAt,
   }) {
     return AcademicWork(
       id: id,
@@ -194,7 +209,10 @@ class AcademicWork {
       abntSections: abntSections,
       fileName: fileName ?? this.fileName,
       localPath: localPath ?? this.localPath,
+      localUri: localUri ?? this.localUri,
       fileUrl: fileUrl ?? this.fileUrl,
+      norm: norm ?? this.norm,
+      savedAt: savedAt ?? this.savedAt,
     );
   }
 }

@@ -14,6 +14,7 @@ import '../../../providers/ai_provider.dart';
 import '../../../providers/user_provider.dart';
 import '../../../providers/work_provider.dart';
 import '../../../providers/credit_provider.dart';
+import '../../../providers/persistence_provider.dart';
 import '../../../models/academic_work.dart';
 
 class CreateWorkScreen extends ConsumerStatefulWidget {
@@ -424,8 +425,15 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
         finalPath = chosenUri.toString();
         print('DEBUG: Arquivo salvo pelo usuário em: $finalPath');
         
-        // Nota: A persistência de permissão automática do file_picker é limitada.
-        // Futura melhoria: Migrar para Saf().pickDirectory para salvamento permanente.
+        // ETAPA 1: Persistir permissão e registrar no Firestore (Nova Estrutura)
+        await ref.read(workPersistenceServiceProvider).persistAndRegister(
+          workId: _generatedWork!.id,
+          userId: user.uid,
+          uri: finalPath,
+          fileName: fileName,
+          pages: _generatedWork!.pageCount,
+          norm: _selectedFormat.toUpperCase(),
+        );
       } else {
         // 2. Fallback: Salvar na pasta interna do App se o usuário cancelar ou ocorrer erro
         print('DEBUG: Usando salvamento interno (fallback)');
@@ -434,6 +442,17 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
         final file = File(finalPath);
         await file.writeAsBytes(bytes);
         print('DEBUG: Arquivo salvo internamente em: $finalPath');
+
+        // Atualizar Firestore para o fallback (Nova Estrutura)
+        await ref.read(workServiceProvider).updateWorkStatus(
+          _generatedWork!.id,
+          WorkStatus.completed,
+          localPath: finalPath,
+          fileName: fileName,
+          norm: _selectedFormat.toUpperCase(),
+          pages: _generatedWork!.pageCount,
+          userId: user.uid,
+        );
       }
 
       // 3. Mostrar Diálogo de Ação Final (Mantendo Abrir e Compartilhar)
@@ -487,25 +506,17 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
           ),
         );
       }
-
-      // 4. Atualizar para 'completed' com o caminho do arquivo final
-      print('DEBUG: Atualizando status para completed no service com path: $finalPath');
-      await ref.read(workServiceProvider).updateWorkStatus(
-        _generatedWork!.id,
-        WorkStatus.completed,
-        localPath: finalPath,
-        fileName: fileName,
-      );
-      print('DEBUG: updateWorkStatus concluído');
+      print('DEBUG: Fluxo finalizado com sucesso');
 
     } catch (e) {
       print('DEBUG ERROR: Erro capturado em _finalizeAndSave: $e');
-      // 3. Marcar como falha no Firestore
+      // 3. Marcar como falha no Firestore (Nova Estrutura)
       if (_generatedWork != null) {
         try {
           await ref.read(workServiceProvider).updateWorkStatus(
             _generatedWork!.id,
             WorkStatus.failed,
+            userId: user.uid,
           );
           print('DEBUG: Status atualizado para failed no catch');
         } catch (saveErr) {
