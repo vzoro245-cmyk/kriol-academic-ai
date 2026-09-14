@@ -58,3 +58,40 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Node.js para atualizar Firestore
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar firebase-admin
+        run: npm install firebase-admin
+
+      - name: Atualizar Firestore com a nova versao
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          VERSION_TAG: ${{ steps.get_version.outputs.VERSION }}
+          REPO: ${{ github.repository }}
+        run: |
+          node -e "
+          const admin = require('firebase-admin');
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+          admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+          const db = admin.firestore();
+
+          const versionTag = process.env.VERSION_TAG;
+          const version = versionTag.replace(/^v/, '');
+          const updateUrl = \`https://github.com/\${process.env.REPO}/releases/download/\${versionTag}/app-release.apk\`;
+
+          db.collection('settings').doc('android_update').update({
+            latestVersion: version,
+            minimumVersion: version,
+            updateUrl: updateUrl
+          }).then(() => {
+            console.log('Firestore atualizado com sucesso: ' + version);
+            process.exit(0);
+          }).catch((err) => {
+            console.error('Erro ao atualizar Firestore:', err);
+            process.exit(1);
+          });
+          "

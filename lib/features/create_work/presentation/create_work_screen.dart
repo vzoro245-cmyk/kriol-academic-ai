@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:saf/saf.dart';
 import '../../../providers/ai_provider.dart';
 import '../../../providers/user_provider.dart';
 import '../../../providers/work_provider.dart';
@@ -27,6 +28,7 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
   int _currentStep = 0;
   bool _isLoading = false;
   String _loadingMessage = 'Preparando trabalho...';
+  int _loadingStep = 0; // 0: IA, 1: Crédito, 2: Preparando, 3: Formatando, 4: Salvando
   bool _isIndividual = true;
   final List<Student> _students = [];
   final TextEditingController _studentNameController = TextEditingController();
@@ -42,16 +44,16 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
   final _classController = TextEditingController();
   final _cityController = TextEditingController();
   final _yearController = TextEditingController(text: DateTime.now().year.toString());
+  final _pagesController = TextEditingController(text: '10');
   final _instructionsController = TextEditingController();
 
   String _selectedLevel = 'Universidade';
   String _selectedType = 'Trabalho de pesquisa';
-  String _selectedPages = '10';
   String _selectedLanguage = 'Português';
 
-  // ABNT Settings
-  bool _isAbnt = true;
-  Map<String, bool> _abntSections = {
+  // Work Structure Settings
+  String _selectedFormat = 'abnt'; // 'abnt', 'professional', 'apa'
+  Map<String, bool> _includedSections = {
     'Capa': true,
     'Folha de rosto': true,
     'Sumário': true,
@@ -82,12 +84,18 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
       
       _selectedLevel = work.level;
       _selectedType = work.type;
-      _selectedPages = work.pageCount.toString();
+      _pagesController.text = work.pageCount.toString();
       _selectedLanguage = work.language;
-      _isAbnt = work.isAbnt;
+      
+      // Mapeamento de compatibilidade
+      if (work.isAbnt) {
+        _selectedFormat = 'abnt';
+      } else {
+        _selectedFormat = 'professional';
+      }
       
       if (work.abntSections.isNotEmpty) {
-        _abntSections.updateAll((key, value) => work.abntSections.contains(key));
+        _includedSections.updateAll((key, value) => work.abntSections.contains(key));
       }
 
       if (work.students.isNotEmpty) {
@@ -116,8 +124,14 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
     _classController.dispose();
     _cityController.dispose();
     _yearController.dispose();
+    _pagesController.dispose();
     _instructionsController.dispose();
     super.dispose();
+  }
+
+  int _calculateCredits(int pages) {
+    if (pages < 5) return 1;
+    return ((pages - 5) ~/ 5) + 1;
   }
 
   void _addStudent() {
@@ -156,15 +170,20 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
 
     setState(() {
       _isLoading = true;
+      _loadingStep = 0;
       _loadingMessage = 'Gerando conteúdo...';
     });
 
     try {
       final aiService = ref.read(aiServiceProvider);
 
-      final selectedAbntSections = _isAbnt
-          ? _abntSections.entries.where((e) => e.value).map((e) => e.key).toList()
-          : <String>[];
+      final includedSectionsList = _includedSections.entries
+          .where((e) => e.value)
+          .map((e) => e.key)
+          .toList();
+
+      final pages = int.tryParse(_pagesController.text) ?? 10;
+      final cost = _calculateCredits(pages);
 
       final structuredContent = await aiService.generateStructuredContent(
         title: _titleController.text,
@@ -173,11 +192,15 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
         subject: _disciplineController.text,
         type: _selectedType,
         level: _selectedLevel,
-        pages: int.tryParse(_selectedPages) ?? 10,
+        pages: pages,
         language: _selectedLanguage,
         instructions: _instructionsController.text,
-        isAbnt: _isAbnt,
-        abntSections: selectedAbntSections,
+        isAbnt: _selectedFormat == 'abnt',
+        abntSections: includedSectionsList,
+        // Adicionando campo extra para o backend identificar a norma específica
+        extraParams: {
+          'formattingStandard': _selectedFormat,
+        },
       );
 
       final finalStudents = _isIndividual
@@ -196,11 +219,11 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
           type: _selectedType,
           level: _selectedLevel,
           language: _selectedLanguage,
-          pageCount: int.tryParse(_selectedPages) ?? 10,
+          pageCount: pages,
           content: jsonEncode(structuredContent),
           status: WorkStatus.completed,
           createdAt: DateTime.now(),
-          costInCredits: 0,
+          costInCredits: cost,
           course: _courseController.text.isEmpty ? null : _courseController.text,
           studentClass: _classController.text,
           institution: _institutionController.text.isEmpty ? null : _institutionController.text,
@@ -209,8 +232,8 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
           year: _yearController.text.isEmpty ? null : _yearController.text,
           instructions: _instructionsController.text.isEmpty ? null : _instructionsController.text,
           students: finalStudents,
-          isAbnt: _isAbnt,
-          abntSections: selectedAbntSections,
+          isAbnt: _selectedFormat == 'abnt',
+          abntSections: includedSectionsList,
         );
         _currentStep++; // Move to review step
       });
@@ -247,18 +270,19 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
       return;
     }
 
-    // 1. Verificação de Créditos (Usando o campo direto do perfil como única fonte de verdade)
+    // 1. Verificação de Créditos
     final int currentCredits = user.credits;
-    print('DEBUG: Créditos atuais: $currentCredits');
+    final int cost = _generatedWork!.costInCredits;
+    print('DEBUG: Créditos atuais: $currentCredits, Custo: $cost');
 
-    if (currentCredits < 1) {
+    if (currentCredits < cost) {
       print('DEBUG: Créditos insuficientes');
       if (mounted) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Créditos Insuficientes'),
-            content: const Text('Você não possui créditos suficientes para gerar este trabalho. Deseja comprar mais?'),
+            content: Text('Você não possui créditos suficientes para gerar este trabalho ($cost necessários). Deseja comprar mais?'),
             actions: [
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
               ElevatedButton(
@@ -275,18 +299,55 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
       return;
     }
 
+    // Diálogo de confirmação final de custo
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar Geração'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Título: ${_generatedWork!.title}'),
+            const SizedBox(height: 8),
+            Text('Tamanho: ${_generatedWork!.pageCount} páginas'),
+            Text('Custo: $cost créditos'),
+            const Divider(height: 32),
+            Text('Seu saldo: $currentCredits créditos', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary, foregroundColor: Colors.white),
+            child: const Text('Confirmar e Gerar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     setState(() {
       _isLoading = true;
+      _loadingStep = 1;
       _loadingMessage = 'Processando crédito...';
     });
 
     try {
-      // 2. Debitar Crédito
-      print('DEBUG: Chamando useCredit para user: ${user.uid}');
-      await ref.read(creditServiceProvider).useCredit(user.uid, _generatedWork!.title);
+      // 2. Debitar Crédito (com valor dinâmico)
+      print('DEBUG: Chamando useCredit para user: ${user.uid}, cost: $cost');
+      await ref.read(creditServiceProvider).useCredit(
+        user.uid, 
+        _generatedWork!.title, 
+        amount: cost, 
+        pages: _generatedWork!.pageCount
+      );
       print('DEBUG: useCredit concluído com sucesso');
 
       setState(() {
+        _loadingStep = 2;
         _loadingMessage = 'Preparando documento...';
       });
 
@@ -297,6 +358,7 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
       print('DEBUG: saveWork concluído');
 
       setState(() {
+        _loadingStep = 3;
         _loadingMessage = 'Aplicando formatação profissional...';
       });
 
@@ -318,7 +380,8 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
         'students': _generatedWork!.students.map((e) => e.toMap()).toList(),
         'city': _cityController.text,
         'year': _yearController.text,
-        'isAbnt': _generatedWork!.isAbnt,
+        'isAbnt': _selectedFormat == 'abnt',
+        'formattingStandard': _selectedFormat,
         'abntSections': _generatedWork!.abntSections,
       };
 
@@ -330,6 +393,7 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
       print('DEBUG: generateDocx recebeu ${bytes.length} bytes');
 
       setState(() {
+        _loadingStep = 4;
         _loadingMessage = 'Salvando DOCX...';
       });
 
@@ -359,6 +423,9 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
       if (savedInExternalStorage) {
         finalPath = chosenUri.toString();
         print('DEBUG: Arquivo salvo pelo usuário em: $finalPath');
+        
+        // Nota: A persistência de permissão automática do file_picker é limitada.
+        // Futura melhoria: Migrar para Saf().pickDirectory para salvamento permanente.
       } else {
         // 2. Fallback: Salvar na pasta interna do App se o usuário cancelar ou ocorrer erro
         print('DEBUG: Usando salvamento interno (fallback)');
@@ -384,8 +451,6 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
               TextButton(
                   onPressed: () {
                     Navigator.pop(context);
-                    // Compartilhar só é confiável a partir do arquivo interno (path de sistema de arquivos real).
-                    // Quando salvo via SAF (content URI), o próprio app de arquivos/Drive já permite compartilhar.
                     if (!savedInExternalStorage) {
                       SharePlus.instance.share(ShareParams(files: [XFile(finalPath)], text: 'Meu trabalho acadêmico: $fileName'));
                     } else {
@@ -393,13 +458,13 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
                         const SnackBar(content: Text('Arquivo já salvo na pasta escolhida. Use o app de arquivos para compartilhar.')),
                       );
                     }
+                    context.go('/dashboard');
                   },
                   child: const Text('Compartilhar')
               ),
               ElevatedButton(
                   onPressed: () async {
                     Navigator.pop(context);
-                    // Abrir diretamente só funciona com path de sistema de arquivos real (fallback interno).
                     if (!savedInExternalStorage) {
                       await OpenFilex.open(finalPath);
                     } else {
@@ -407,11 +472,15 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
                         const SnackBar(content: Text('Use o app de arquivos ou Google Drive para abrir o documento salvo.')),
                       );
                     }
+                    if (mounted) context.go('/dashboard');
                   },
                   child: const Text('Abrir Arquivo')
               ),
               TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.go('/dashboard');
+                  },
                   child: const Text('Fechar')
               ),
             ],
@@ -462,6 +531,13 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
           return false;
         }
         return true;
+      case 2: // Conteúdo (IA)
+        final pages = int.tryParse(_pagesController.text) ?? 0;
+        if (pages < 5 || pages > 25) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('O número de páginas deve estar entre 5 e 25.')));
+          return false;
+        }
+        return true;
       case 1: // Alunos
         if (_isIndividual) {
           if (_studentNameController.text.trim().isEmpty || _studentNumberController.text.trim().isEmpty) {
@@ -489,14 +565,34 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
         ),
       ),
       body: _isLoading
-          ? Center(child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 24),
-          Text(_loadingMessage, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        ],
-      ))
+          ? Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    LinearProgressIndicator(
+                      value: (_loadingStep + 1) / 5,
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    const SizedBox(height: 32),
+                    Text(
+                      _loadingMessage,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 48),
+                    _buildLoadingStep('Gerando rascunho com IA', 0),
+                    _buildLoadingStep('Validando créditos', 1),
+                    _buildLoadingStep('Preparando estrutura', 2),
+                    _buildLoadingStep('Aplicando formatação ABNT/Profissional', 3),
+                    _buildLoadingStep('Finalizando arquivo DOCX', 4),
+                  ],
+                ),
+              ),
+            )
           : Stepper(
         type: StepperType.vertical,
         currentStep: _currentStep,
@@ -536,14 +632,48 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
             content: _buildFormattingStep(),
           ),
           Step(
-            title: const Text('ABNT'),
+            title: const Text('Estrutura do Trabalho'),
             isActive: _currentStep >= 4,
-            content: _isAbnt ? _buildAbntStep() : const Text('Formatação normal selecionada.'),
+            content: _buildStructureStep(),
           ),
           Step(
             title: const Text('Revisão e Geração'),
             isActive: _currentStep >= 5,
             content: _buildReviewStep(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingStep(String label, int stepIndex) {
+    bool isCompleted = _loadingStep > stepIndex;
+    bool isCurrent = _loadingStep == stepIndex;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          if (isCompleted)
+            const Icon(Icons.check_circle, color: Colors.green, size: 24)
+          else if (isCurrent)
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Icon(Icons.circle_outlined, color: Colors.grey[300], size: 24),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                color: isCurrent ? Theme.of(context).colorScheme.primary : (isCompleted ? Colors.black87 : Colors.grey),
+              ),
+            ),
           ),
         ],
       ),
@@ -645,14 +775,21 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
           items: ['Português', 'Inglês', 'Francês'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
           onChanged: (v) => setState(() => _selectedLanguage = v!),
         ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          initialValue: _selectedPages,
-          decoration: const InputDecoration(labelText: 'Tamanho (Páginas)', border: OutlineInputBorder()),
-          items: ['5', '10', '20', '30'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-          onChanged: (v) => setState(() => _selectedPages = v!),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _pagesController,
+          decoration: InputDecoration(
+            labelText: 'Tamanho (5 a 25 páginas) *',
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.auto_stories_outlined),
+            helperText: 'Custo: ${_calculateCredits(int.tryParse(_pagesController.text) ?? 5)} crédito(s)',
+            helperStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+          ),
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onChanged: (v) => setState(() {}),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         TextField(controller: _instructionsController, maxLines: 2, decoration: const InputDecoration(labelText: 'Instruções Adicionais', border: OutlineInputBorder())),
       ],
     );
@@ -661,33 +798,51 @@ class _CreateWorkScreenState extends ConsumerState<CreateWorkScreen> {
   Widget _buildFormattingStep() {
     return Column(
       children: [
-        RadioListTile<bool>(
-            title: const Text('ABNT (Associação Brasileira de Normas Técnicas)'),
+        RadioListTile<String>(
+            title: const Text('ABNT (Normas Brasileiras)'),
             subtitle: const Text('Margens 3/3/2/2, Espaçamento 1.5 e formatação rígida.'),
-            value: true,
-            // ignore: deprecated_member_use
-            groupValue: _isAbnt,
-            // ignore: deprecated_member_use
-            onChanged: (v) => setState(() => _isAbnt = v!)
+            value: 'abnt',
+            groupValue: _selectedFormat,
+            onChanged: (v) => setState(() => _selectedFormat = v!)
         ),
-        RadioListTile<bool>(
+        RadioListTile<String>(
             title: const Text('Normal / Profissional'),
             subtitle: const Text('Estética moderna, limpa e elegante para documentos executivos.'),
-            value: false,
-            // ignore: deprecated_member_use
-            groupValue: _isAbnt,
-            // ignore: deprecated_member_use
-            onChanged: (v) => setState(() => _isAbnt = v!)
+            value: 'professional',
+            groupValue: _selectedFormat,
+            onChanged: (v) => setState(() => _selectedFormat = v!)
+        ),
+        RadioListTile<String>(
+            title: const Text('APA (7ª Edição)'),
+            subtitle: const Text('Padrão internacional. Espaçamento duplo e margens de 2.54cm.'),
+            value: 'apa',
+            groupValue: _selectedFormat,
+            onChanged: (v) => setState(() => _selectedFormat = v!)
         ),
       ],
     );
   }
 
-  Widget _buildAbntStep() {
+  Widget _buildStructureStep() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CheckboxListTile(title: const Text('Todo o trabalho'), value: _abntSections.values.every((v) => v), onChanged: (v) => setState(() => _abntSections.updateAll((k, val) => v!))),
-        ..._abntSections.keys.map((k) => CheckboxListTile(title: Text(k), value: _abntSections[k], onChanged: (v) => setState(() => _abntSections[k] = v!))),
+        const Text(
+          'Selecione as seções que devem constar no documento final:',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        CheckboxListTile(
+          title: const Text('Todas as seções'), 
+          value: _includedSections.values.every((v) => v), 
+          onChanged: (v) => setState(() => _includedSections.updateAll((k, val) => v!))
+        ),
+        const Divider(),
+        ..._includedSections.keys.map((k) => CheckboxListTile(
+          title: Text(k), 
+          value: _includedSections[k], 
+          onChanged: (v) => setState(() => _includedSections[k] = v!)
+        )),
       ],
     );
   }

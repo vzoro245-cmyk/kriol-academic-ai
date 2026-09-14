@@ -21,6 +21,7 @@ class AIService {
     String? instructions,
     bool isAbnt = false,
     List<String> abntSections = const [],
+    Map<String, dynamic>? extraParams,
   }) async {
     try {
       final response = await _dio.post('/generate', data: {
@@ -35,6 +36,7 @@ class AIService {
         'instructions': instructions ?? '',
         'isAbnt': isAbnt,
         'abntSections': abntSections,
+        if (extraParams != null) ...extraParams,
       });
 
       if (response.statusCode == 200) {

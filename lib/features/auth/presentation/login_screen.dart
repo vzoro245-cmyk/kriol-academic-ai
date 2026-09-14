@@ -93,14 +93,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.school, size: 100, color: Colors.white),
+                      const Center(
+                        child: CircleAvatar(
+                          radius: 50,
+                          backgroundColor: Colors.white,
+                          backgroundImage: AssetImage('assets/icon/app_icon.png'),
+                        ),
+                      ),
                       const SizedBox(height: 24),
                       Text(
                         'Kriol Academic AI',
                         style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -127,7 +133,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (isMobile) ...[
-                        const Icon(Icons.school, size: 64, color: Colors.blue),
+                        Center(
+                          child: CircleAvatar(
+                            radius: 32,
+                            backgroundColor: Colors.white,
+                            backgroundImage: const AssetImage('assets/icon/app_icon.png'),
+                            foregroundColor: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'Kriol Academic AI',

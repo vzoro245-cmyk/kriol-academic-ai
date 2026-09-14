@@ -38,11 +38,13 @@ class CreditService {
     return query.docs.map((doc) => CreditPackage.fromFirestore(doc)).toList();
   }
 
-  Future<void> useCredit(String userId, String workTitle) async {
+  Future<void> useCredit(String userId, String workTitle, {required int amount, required int pages}) async {
     try {
       final response = await _dio.post('/credits/use', data: {
         'userId': userId,
-        'description': 'Geração de trabalho: $workTitle',
+        'amount': amount,
+        'pages': pages,
+        'description': 'Geração de trabalho ($pages pág.): $workTitle',
       });
 
       if (response.statusCode != 200) {

@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:saf/saf.dart';
 import '../../../providers/work_provider.dart';
 import '../../../models/academic_work.dart';
 
@@ -53,7 +54,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           print('DEBUG: Arquivo local não existe fisicamente no dispositivo.');
         }
       } else {
-        print('DEBUG: Path local é uma URI do SAF (/document/ ou content://). Ignorando leitura direta via File().');
+        print('DEBUG: Path local é uma URI do SAF. Tentando leitura via pacote saf...');
+        try {
+          final bytes = await Saf().readFileBytes(work.localPath!);
+          if (bytes.isNotEmpty) {
+            print('DEBUG: Leitura via saf bem-sucedida. Bytes lidos: ${bytes.length}');
+            return bytes;
+          } else {
+             print('DEBUG: saf retornou bytes vazios.');
+          }
+        } catch (e) {
+          print('DEBUG ERROR: Falha ao ler via saf: $e');
+        }
       }
     }
 

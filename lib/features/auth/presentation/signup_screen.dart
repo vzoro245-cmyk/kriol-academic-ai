@@ -94,7 +94,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.school, size: 100, color: Colors.white),
+                      const Center(
+                        child: CircleAvatar(
+                          radius: 50,
+                          backgroundColor: Colors.white,
+                          backgroundImage: AssetImage('assets/icon/app_icon.png'),
+                        ),
+                      ),
                       const SizedBox(height: 24),
                       Text(
                         'Kriol Academic AI',
@@ -128,7 +134,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (isMobile) ...[
-                        const Icon(Icons.school, size: 64, color: Colors.blue),
+                        Center(
+                          child: CircleAvatar(
+                            radius: 32,
+                            backgroundColor: Colors.white,
+                            backgroundImage: const AssetImage('assets/icon/app_icon.png'),
+                            foregroundColor: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'Kriol Academic AI',

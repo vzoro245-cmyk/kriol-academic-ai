@@ -49,7 +49,13 @@ class MainLayout extends ConsumerWidget {
             children: [
               const DrawerHeader(
                 decoration: BoxDecoration(color: Colors.blue),
-                child: Center(child: Icon(Icons.school, size: 64, color: Colors.white)),
+                child: Center(
+                  child: CircleAvatar(
+                    radius: 40,
+                    backgroundColor: Colors.white,
+                    backgroundImage: AssetImage('assets/icon/app_icon.png'),
+                  ),
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.home_outlined),
@@ -137,7 +143,11 @@ class MainLayout extends ConsumerWidget {
             leading: Column(
               children: [
                 const SizedBox(height: 20),
-                const Icon(Icons.school, size: 40, color: Colors.blue),
+                const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Colors.white,
+                  backgroundImage: AssetImage('assets/icon/app_icon.png'),
+                ),
                 const SizedBox(height: 20),
               ],
             ),
