@@ -16,7 +16,7 @@ class DashboardScreen extends ConsumerWidget {
     return userProfileAsync.when(
       data: (profile) {
         final name = profile?.name ?? 'Usuário';
-        final cyberName = profile?.cyberName ?? 'Cyber';
+        final username = profile?.username ?? 'user';
         final credits = profile?.credits ?? 0;
 
         final isMobile = MediaQuery.of(context).size.width < 600;
@@ -34,8 +34,8 @@ class DashboardScreen extends ConsumerWidget {
                       'Olá, $name',
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 8),
-                    Text(cyberName),
+                    const SizedBox(height: 4),
+                    Text('@$username', style: TextStyle(color: Theme.of(context).colorScheme.outline)),
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
@@ -61,8 +61,8 @@ class DashboardScreen extends ConsumerWidget {
                           'Olá, $name',
                           style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                         ),
-                        const SizedBox(height: 8),
-                        Text(cyberName),
+                        const SizedBox(height: 4),
+                        Text('@$username', style: TextStyle(color: Theme.of(context).colorScheme.outline)),
                         const SizedBox(height: 8),
                         const Text('O que você deseja fazer hoje?'),
                       ],

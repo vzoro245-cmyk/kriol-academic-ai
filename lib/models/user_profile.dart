@@ -16,7 +16,7 @@ class UserProfile {
   final String uid;
   final String name;
   final String email;
-  final String cyberName;
+  final String username;
   final String phone;
   final int credits;
   final UserStatus status;
@@ -26,7 +26,7 @@ class UserProfile {
     required this.uid,
     required this.name,
     required this.email,
-    required this.cyberName,
+    required this.username,
     required this.phone,
     required this.credits,
     required this.status,
@@ -39,7 +39,7 @@ class UserProfile {
       uid: doc.id,
       name: data['name'] ?? '',
       email: data['email'] ?? '',
-      cyberName: data['cyberName'] ?? '',
+      username: data['username'] ?? '',
       phone: data['phone'] ?? '',
       credits: (data['credits'] as num?)?.toInt() ?? 0,
       status: UserStatus.fromString(data['status'] ?? 'active'),
@@ -51,7 +51,7 @@ class UserProfile {
     return {
       'name': name,
       'email': email,
-      'cyberName': cyberName,
+      'username': username,
       'phone': phone,
       'credits': credits,
       'status': status.name,
@@ -61,7 +61,7 @@ class UserProfile {
 
   UserProfile copyWith({
     String? name,
-    String? cyberName,
+    String? username,
     String? phone,
     int? credits,
     UserStatus? status,
@@ -70,7 +70,7 @@ class UserProfile {
       uid: uid,
       name: name ?? this.name,
       email: email,
-      cyberName: cyberName ?? this.cyberName,
+      username: username ?? this.username,
       phone: phone ?? this.phone,
       credits: credits ?? this.credits,
       status: status ?? this.status,

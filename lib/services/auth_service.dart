@@ -1,7 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/user_profile.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
@@ -20,6 +23,48 @@ class AuthService {
     }
   }
 
+  Future<UserCredential> signUp({
+    required String name,
+    required String username,
+    required String email,
+    required String phone,
+    required String password,
+  }) async {
+    try {
+      // 1. Criar no Firebase Auth
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password.trim(),
+      );
+
+      final user = credential.user;
+      if (user != null) {
+        // 2. Atualizar Display Name no Auth
+        await user.updateDisplayName(name);
+
+        // 3. Criar Perfil no Firestore
+        final profile = UserProfile(
+          uid: user.uid,
+          name: name,
+          email: email.trim(),
+          username: username.trim(),
+          phone: phone.trim(),
+          credits: 0,
+          status: UserStatus.active,
+          createdAt: DateTime.now(),
+        );
+
+        await _db.collection('users').doc(user.uid).set(profile.toFirestore());
+      }
+
+      return credential;
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthError(e);
+    } catch (e) {
+      throw 'Erro ao criar conta. Tente novamente.';
+    }
+  }
+
   Future<void> signOut() async {
     await _auth.signOut();
   }
@@ -34,6 +79,10 @@ class AuthService {
 
   String _handleAuthError(FirebaseAuthException e) {
     switch (e.code) {
+      case 'email-already-in-use':
+        return 'Este email já está cadastrado em outra conta.';
+      case 'weak-password':
+        return 'A senha é muito fraca. Use pelo menos 6 caracteres.';
       case 'user-not-found':
       case 'wrong-password':
       case 'invalid-credential':

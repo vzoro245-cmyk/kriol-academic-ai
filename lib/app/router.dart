@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/presentation/login_screen.dart';
+import '../features/auth/presentation/signup_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/create_work/presentation/create_work_screen.dart';
 import '../features/credits/presentation/credits_screen.dart';
@@ -33,6 +34,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final isLoggedIn = authUserId != null;
       final isLoggingIn = state.uri.path == '/login';
+      final isSigningUp = state.uri.path == '/signup';
       final isForcingUpdate = state.uri.path == '/force-update';
 
       // 1. Verificação de Atualização Obrigatória (Somente após login)
@@ -44,7 +46,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (!isLoggedIn) {
-        return isLoggingIn ? null : '/login';
+        if (isLoggingIn || isSigningUp) return null;
+        return '/login';
       }
 
       // Se logado, verificar status do perfil
@@ -52,7 +55,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         return isLoggingIn ? null : '/login';
       }
 
-      if (isLoggingIn) {
+      if (isLoggingIn || isSigningUp) {
         return '/dashboard';
       }
 
@@ -62,6 +65,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/signup',
+        builder: (context, state) => const SignupScreen(),
       ),
       GoRoute(
         path: '/force-update',

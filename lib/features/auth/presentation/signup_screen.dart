@@ -2,41 +2,73 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../providers/auth_provider.dart';
-import '../../../providers/user_provider.dart';
-import '../../../models/user_profile.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends ConsumerStatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _SignupScreenState extends ConsumerState<SignupScreen> {
+  final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  
   bool _isLoading = false;
   String? _errorMessage;
 
   @override
   void dispose() {
+    _nameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
+  Future<void> _handleSignup() async {
+    final name = _nameController.text.trim();
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    if (name.isEmpty || username.isEmpty || email.isEmpty || phone.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'Por favor, preencha todos os campos.');
+      return;
+    }
+
+    if (password != confirmPassword) {
+      setState(() => _errorMessage = 'As senhas não coincidem.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setState(() => _errorMessage = 'A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      await ref.read(authServiceProvider).signIn(
-            _emailController.text,
-            _passwordController.text,
+      await ref.read(authServiceProvider).signUp(
+            name: name,
+            username: username,
+            email: email,
+            phone: phone,
+            password: password,
           );
-      // O GoRouter redirecionará automaticamente via routerProvider
+      // O GoRouter redirecionará automaticamente
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
@@ -45,45 +77,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  Future<void> _handleForgotPassword() async {
-    if (_emailController.text.isEmpty) {
-      setState(() => _errorMessage = 'Por favor, insira o seu email primeiro.');
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    try {
-      await ref.read(authServiceProvider).sendPasswordResetEmail(_emailController.text);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Se existir uma conta associada a este email, enviaremos instruções para redefinir a senha.'),
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() => _errorMessage = e.toString());
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Verificar se o usuário está desativado no perfil carregado
-    final userProfile = ref.watch(userProfileProvider);
-    final userStatusError = userProfile.value?.status == UserStatus.disabled
-        ? 'Esta conta está desativada. Entre em contato com o administrador.'
-        : null;
-
-    final displayError = _errorMessage ?? userStatusError;
-
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
       body: Row(
         children: [
-          // Left side: Branding/Image (Escondido no Mobile)
+          // Left side: Branding (Hidden on Mobile)
           if (!isMobile)
             Expanded(
               flex: 1,
@@ -98,30 +99,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Text(
                         'Kriol Academic AI',
                         style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Plataforma de produção acadêmica',
+                        'Crie sua conta e comece agora',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.white70,
-                        ),
+                              color: Colors.white70,
+                            ),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
-          // Right side: Login form
+          // Right side: Signup form
           Expanded(
             flex: 1,
-            child: SingleChildScrollView(
-              child: Center(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(32),
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 400),
-                  padding: const EdgeInsets.all(32),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -133,22 +134,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           'Kriol Academic AI',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                          ),
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                              ),
                         ),
                         const SizedBox(height: 32),
                       ],
                       Text(
-                        'Bem-vindo de volta',
+                        'Criar conta',
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       const SizedBox(height: 8),
-                      const Text('Introduza os seus dados para aceder à sua conta.'),
+                      const Text('Preencha os dados abaixo para se cadastrar.'),
                       const SizedBox(height: 32),
-                      if (displayError != null)
+                      if (_errorMessage != null)
                         Container(
                           padding: const EdgeInsets.all(12),
                           margin: const EdgeInsets.only(bottom: 24),
@@ -158,10 +159,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                           ),
                           child: Text(
-                            displayError,
+                            _errorMessage!,
                             style: const TextStyle(color: Colors.red),
                           ),
                         ),
+                      TextField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome Completo',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                        enabled: !_isLoading,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _usernameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome de Usuário',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.alternate_email),
+                        ),
+                        enabled: !_isLoading,
+                      ),
+                      const SizedBox(height: 16),
                       TextField(
                         controller: _emailController,
                         decoration: const InputDecoration(
@@ -170,6 +191,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           prefixIcon: Icon(Icons.email_outlined),
                         ),
                         keyboardType: TextInputType.emailAddress,
+                        enabled: !_isLoading,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _phoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Telefone',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.phone_outlined),
+                        ),
+                        keyboardType: TextInputType.phone,
                         enabled: !_isLoading,
                       ),
                       const SizedBox(height: 16),
@@ -183,17 +215,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         enabled: !_isLoading,
                       ),
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _isLoading ? null : _handleForgotPassword,
-                          child: const Text('Esqueci minha senha'),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _confirmPasswordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirmar Senha',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.lock_reset_outlined),
                         ),
+                        enabled: !_isLoading,
                       ),
                       const SizedBox(height: 24),
                       ElevatedButton(
-                        onPressed: _isLoading ? null : _handleLogin,
+                        onPressed: _isLoading ? null : _handleSignup,
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 20),
                           backgroundColor: Theme.of(context).colorScheme.primary,
@@ -208,13 +243,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text('Entrar'),
+                            : const Text('Criar Conta'),
                       ),
                       const SizedBox(height: 16),
                       Center(
                         child: TextButton(
-                          onPressed: _isLoading ? null : () => context.push('/signup'),
-                          child: const Text('Solicitar acesso'),
+                          onPressed: _isLoading ? null : () => context.pop(),
+                          child: const Text('Já tem conta? Fazer login'),
                         ),
                       ),
                     ],
