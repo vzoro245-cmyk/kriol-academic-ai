@@ -38,7 +38,7 @@ class MainLayout extends ConsumerWidget {
     if (isMobile) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Kriol Academic AI', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Text('LEVIX', style: TextStyle(fontWeight: FontWeight.bold)),
           actions: [
             _CreditsBadge(),
             const SizedBox(width: 8),
@@ -227,7 +227,7 @@ class _TopBar extends ConsumerWidget {
       child: Row(
         children: [
           Text(
-            'Kriol Academic AI',
+            'LEVIX',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const Spacer(),

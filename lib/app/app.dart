@@ -11,7 +11,7 @@ class KriolAcademicApp extends ConsumerWidget {
     final goRouter = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Kriol Academic AI',
+      title: 'LEVIX',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

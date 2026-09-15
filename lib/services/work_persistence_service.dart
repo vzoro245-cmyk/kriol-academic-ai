@@ -1,11 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../models/academic_work.dart';
 import 'work_service.dart';
 
 class WorkPersistenceService {
   final WorkService _workService;
-  // Canal customizado do projeto Kriol
+  // Canal customizado do projeto LEVIX
   static const _permissionChannel = MethodChannel('kriol/storage_permissions');
 
   WorkPersistenceService(this._workService);
@@ -21,7 +22,7 @@ class WorkPersistenceService {
     bool permissionPersisted = false;
 
     try {
-      print('DEBUG: Solicitando persistência nativa para: $uri');
+      debugPrint('DEBUG: Solicitando persistência nativa para: $uri');
 
       // Chamada ao código Kotlin nativo que implementamos
       final result = await _permissionChannel.invokeMethod<bool>(
@@ -32,18 +33,18 @@ class WorkPersistenceService {
       permissionPersisted = result ?? false;
       
       if (permissionPersisted) {
-        print('✅ DEBUG: Permissão persistida com sucesso para URI: $uri');
+        debugPrint('✅ DEBUG: Permissão persistida com sucesso para URI: $uri');
       } else {
-        print('⚠️ DEBUG: Código nativo retornou falso para a persistência.');
+        debugPrint('⚠️ DEBUG: Código nativo retornou falso para a persistência.');
       }
     } on PlatformException catch (e) {
-      print('❌ DEBUG ERROR: Falha crítica no MethodChannel nativo: ${e.message}');
+      debugPrint('❌ DEBUG ERROR: Falha crítica no MethodChannel nativo: ${e.message}');
     } catch (e) {
-      print('❌ DEBUG ERROR: Erro inesperado na persistência: $e');
+      debugPrint('❌ DEBUG ERROR: Erro inesperado na persistência: $e');
     }
 
     // Registro no Firestore com campo de controle
-    print('DEBUG: Registrando trabalho no Firestore (Sub-coleção)...');
+    debugPrint('DEBUG: Registrando trabalho no Firestore (Sub-coleção)...');
     await _workService.updateWorkStatus(
       workId,
       WorkStatus.completed,
@@ -63,6 +64,6 @@ class WorkPersistenceService {
         .doc(workId)
         .update({'permissionPersisted': permissionPersisted});
 
-    print('DEBUG: Fluxo de finalização concluído.');
+    debugPrint('DEBUG: Fluxo de finalização concluído.');
   }
 }

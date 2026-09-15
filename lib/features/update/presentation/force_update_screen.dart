@@ -30,7 +30,7 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen> {
       final dio = Dio();
       final tempDir = await getTemporaryDirectory();
       // Usamos um nome fixo para o APK temporário para evitar acumular arquivos
-      final savePath = '${tempDir.path}/kriol_update.apk';
+      final savePath = '${tempDir.path}/levix_update.apk';
 
       // Garantir que o arquivo anterior seja removido antes de baixar o novo
       final oldFile = File(savePath);

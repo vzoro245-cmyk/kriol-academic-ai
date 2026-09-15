@@ -1,15 +1,16 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:saf/saf.dart';
 import '../../../providers/work_provider.dart';
+import '../../../providers/file_opener_provider.dart';
+import '../../../services/file_opener_service.dart';
 import '../../../models/academic_work.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
@@ -31,12 +32,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   Future<Uint8List?> _getFileBytes(AcademicWork work) async {
-    print('DEBUG: _getFileBytes iniciado para trabalho: ${work.title}');
-    
     // 1. Tentar ler do arquivo local se for um caminho absoluto válido
     if (work.localPath != null) {
-      print('DEBUG: Verificando path local: ${work.localPath}');
-      
       // Ignora caminhos que começam com /document/ ou content:// (SAF)
       final isSafPath = work.localPath!.startsWith('/document/') || work.localPath!.startsWith('content://');
       
@@ -44,127 +41,107 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         final file = File(work.localPath!);
         if (await file.exists()) {
           try {
-            final bytes = await file.readAsBytes();
-            print('DEBUG: Leitura local bem-sucedida. Bytes lidos: ${bytes.length}');
-            return bytes;
+            return await file.readAsBytes();
           } catch (e) {
-            print('DEBUG ERROR: Falha ao ler arquivo local: $e');
+            debugPrint('Falha ao ler arquivo local: $e');
           }
-        } else {
-          print('DEBUG: Arquivo local não existe fisicamente no dispositivo.');
         }
       } else {
-        print('DEBUG: Path local é uma URI do SAF. Tentando leitura via pacote saf...');
         try {
           final bytes = await Saf().readFileBytes(work.localPath!);
           if (bytes.isNotEmpty) {
-            print('DEBUG: Leitura via saf bem-sucedida. Bytes lidos: ${bytes.length}');
             return bytes;
-          } else {
-             print('DEBUG: saf retornou bytes vazios.');
           }
         } catch (e) {
-          print('DEBUG ERROR: Falha ao ler via saf: $e');
+          debugPrint('Falha ao ler via saf: $e');
         }
       }
     }
 
     // 2. Fallback: Baixar da nuvem (fileUrl)
-    if (work.fileUrl != null) {
-      print('DEBUG: Tentando baixar da nuvem (fileUrl): ${work.fileUrl}');
+    if (work.fileUrl != null && work.fileUrl!.isNotEmpty) {
       try {
         final dio = Dio();
         final response = await dio.get(
           work.fileUrl!,
           options: Options(responseType: ResponseType.bytes),
         );
-        print('DEBUG: Resposta do download recebida. Status: ${response.statusCode}');
         
         if (response.statusCode == 200) {
-          final bytes = Uint8List.fromList(response.data);
-          print('DEBUG: Download concluído. Bytes recebidos: ${bytes.length}');
-          return bytes;
-        } else {
-          print('DEBUG ERROR: Download falhou com status code: ${response.statusCode}');
+          return Uint8List.fromList(response.data);
         }
       } catch (e) {
-        print('DEBUG ERROR: Exceção capturada no download (Dio): $e');
+        debugPrint('Exceção capturada no download (Dio): $e');
       }
-    } else {
-      print('DEBUG: fileUrl é nulo, impossível baixar arquivo.');
     }
     
-    print('DEBUG: _getFileBytes retornando null (todas as tentativas falharam)');
     return null;
   }
 
   Future<void> _openWorkFile(AcademicWork work) async {
-    print('DEBUG: _openWorkFile iniciado para: ${work.title}');
     setState(() => _isActionLoading = true);
     
     try {
-      // Se arquivo local existe, abre direto
-      if (work.localPath != null) {
-        print('DEBUG: Checando existência local para abertura: ${work.localPath}');
-        final file = File(work.localPath!);
-        if (await file.exists()) {
-          print('DEBUG: Arquivo local encontrado. Chamando OpenFilex.open');
-          final result = await OpenFilex.open(work.localPath!);
-          print('DEBUG: OpenFilex result (local): ${result.type} - ${result.message}');
-          return;
-        }
-      }
+      final opener = ref.read(fileOpenerServiceProvider);
+      final result = await opener.openWork(work);
 
-      // Se não, baixa para pasta temporária e abre
-      print('DEBUG: Arquivo local indisponível. Iniciando fluxo de bytes (cache/download).');
-      final bytes = await _getFileBytes(work);
-      
-      if (bytes != null) {
-        final tempDir = await getTemporaryDirectory();
-        final tempPath = '${tempDir.path}/${work.fileName ?? "${work.title}.docx"}';
-        print('DEBUG: Gravando bytes no arquivo temporário: $tempPath');
-        final tempFile = File(tempPath);
-        await tempFile.writeAsBytes(bytes);
-        
-        print('DEBUG: Arquivo temporário gravado. Chamando OpenFilex.open');
-        final result = await OpenFilex.open(tempPath);
-        print('DEBUG: OpenFilex result (temp): ${result.type} - ${result.message}');
-      } else {
-        print('DEBUG ERROR: Falha ao obter bytes para abertura (bytes == null)');
-        if (mounted) {
-          final isSafPath = work.localPath?.startsWith('/document/') ?? work.localPath?.startsWith('content://') ?? false;
-          final message = isSafPath 
-            ? 'Este arquivo foi salvo em uma pasta externa e não pode ser reaberto por aqui. Verifique o arquivo diretamente na pasta que você escolheu.'
-            : 'Não foi possível obter o arquivo para abrir (Link de backup não disponível).';
-            
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message), duration: const Duration(seconds: 5)),
-          );
-        }
-      }
-    } catch (e) {
-      print('DEBUG ERROR: Exceção capturada em _openWorkFile: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao abrir arquivo: $e'), backgroundColor: Colors.red),
-        );
+        if (result != FileOpenerResult.success) {
+          _handleOpeningError(result, work);
+        }
       }
     } finally {
-      print('DEBUG: _openWorkFile finalizado');
       if (mounted) setState(() => _isActionLoading = false);
     }
   }
 
+  void _handleOpeningError(FileOpenerResult result, AcademicWork work) {
+    String message = 'Não foi possível abrir o arquivo.';
+    bool showRegenerate = false;
+
+    if (result == FileOpenerResult.fileNotFound) {
+      message = 'O arquivo original não foi encontrado ou está inacessível.';
+      showRegenerate = true;
+    } else if (result == FileOpenerResult.permissionDenied) {
+      message = 'O aplicativo não tem permissão para ler o arquivo.';
+      showRegenerate = true;
+    } else if (result == FileOpenerResult.appNotFound) {
+      message = 'Você não possui um aplicativo instalado para abrir arquivos Word (.docx).';
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ops!'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('FECHAR'),
+          ),
+          if (showRegenerate)
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _regenerateWork(work);
+              },
+              child: const Text('REGENERAR AGORA'),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveWorkAs(AcademicWork work) async {
-    print('DEBUG: _saveWorkAs iniciado para: ${work.title}');
+    debugPrint('DEBUG: _saveWorkAs iniciado para: ${work.title}');
     setState(() => _isActionLoading = true);
     
     try {
-      print('DEBUG: Obtendo bytes para salvamento...');
+      debugPrint('DEBUG: Obtendo bytes para salvamento...');
       final bytes = await _getFileBytes(work);
       
       if (bytes == null) {
-        print('DEBUG ERROR: Falha ao obter bytes para salvamento (bytes == null)');
+        debugPrint('DEBUG ERROR: Falha ao obter bytes para salvamento (bytes == null)');
         if (mounted) {
           final isSafPath = work.localPath?.startsWith('/document/') ?? work.localPath?.startsWith('content://') ?? false;
           final message = isSafPath 
@@ -180,7 +157,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
       final fileName = work.fileName ?? '${work.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')}.docx';
       
-      print('DEBUG: Chamando FilePicker.saveFile com fileName: $fileName');
+      debugPrint('DEBUG: Chamando FilePicker.saveFile com fileName: $fileName');
       final chosenUri = await FilePicker.saveFile(
         dialogTitle: 'Salvar Trabalho em...',
         fileName: fileName,
@@ -189,7 +166,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         bytes: bytes,
       );
 
-      print('DEBUG: FilePicker.saveFile retornou chosenUri: $chosenUri');
+      debugPrint('DEBUG: FilePicker.saveFile retornou chosenUri: $chosenUri');
 
       if (mounted && chosenUri != null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -197,14 +174,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         );
       }
     } catch (e) {
-      print('DEBUG ERROR: Exceção capturada em _saveWorkAs: $e');
+      debugPrint('DEBUG ERROR: Exceção capturada em _saveWorkAs: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erro ao salvar arquivo: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
-      print('DEBUG: _saveWorkAs finalizado');
+      debugPrint('DEBUG: _saveWorkAs finalizado');
       if (mounted) setState(() => _isActionLoading = false);
     }
   }

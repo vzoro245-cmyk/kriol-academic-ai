@@ -11,7 +11,7 @@ class CreditsScreen extends ConsumerWidget {
   Future<void> _buyCredits(CreditPackage package) async {
     const whatsappNumber = '245969217939';
     final message = Uri.encodeComponent(
-      'Olá! Gostaria de comprar o ${package.name} (${package.credits} créditos) para o Kriol Academic AI.'
+      'Olá! Gostaria de comprar o ${package.name} (${package.credits} créditos) para o LEVIX.'
     );
     final url = Uri.parse('https://wa.me/$whatsappNumber?text=$message');
     
