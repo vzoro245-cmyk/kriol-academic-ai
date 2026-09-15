@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/settings_provider.dart';
+import '../../../providers/theme_provider.dart';
 import '../../../models/app_settings.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -119,6 +120,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                 _buildSection(
                   context,
+                  title: '🎨 Aparência',
+                  children: [
+                    _buildThemeOption(context, 'Sistema (Padrão)', Icons.brightness_auto, ThemeMode.system),
+                    _buildThemeOption(context, 'Modo Claro', Icons.light_mode, ThemeMode.light),
+                    _buildThemeOption(context, 'Modo Escuro', Icons.dark_mode, ThemeMode.dark),
+                  ],
+                ),
+
+                _buildSection(
+                  context,
                   title: '⚙️ Sistema',
                   children: [
                     const Text('Armazenamento de arquivos', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -167,6 +178,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildThemeOption(BuildContext context, String label, IconData icon, ThemeMode mode) {
+    final currentMode = ref.watch(themeModeProvider);
+
+    return RadioListTile<ThemeMode>(
+      title: Text(label),
+      secondary: Icon(icon),
+      value: mode,
+      groupValue: currentMode,
+      onChanged: (ThemeMode? newMode) {
+        if (newMode != null) {
+          ref.read(themeModeProvider.notifier).setThemeMode(newMode);
+        }
+      },
     );
   }
 }

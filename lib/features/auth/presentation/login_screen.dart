@@ -97,7 +97,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: CircleAvatar(
                           radius: 50,
                           backgroundColor: Colors.white,
-                          backgroundImage: AssetImage('assets/icon/app_icon.png'),
+                          backgroundImage: AssetImage('assets/icon/icon.png'),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -137,7 +137,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           child: CircleAvatar(
                             radius: 32,
                             backgroundColor: Colors.white,
-                            backgroundImage: const AssetImage('assets/icon/app_icon.png'),
+                            backgroundImage: const AssetImage('assets/icon/icon.png'),
                             foregroundColor: Theme.of(context).colorScheme.primary,
                           ),
                         ),

@@ -53,7 +53,7 @@ class MainLayout extends ConsumerWidget {
                   child: CircleAvatar(
                     radius: 40,
                     backgroundColor: Colors.white,
-                    backgroundImage: AssetImage('assets/icon/app_icon.png'),
+                    backgroundImage: AssetImage('assets/icon/icon.png'),
                   ),
                 ),
               ),
@@ -146,7 +146,7 @@ class MainLayout extends ConsumerWidget {
                 const CircleAvatar(
                   radius: 20,
                   backgroundColor: Colors.white,
-                  backgroundImage: AssetImage('assets/icon/app_icon.png'),
+                  backgroundImage: AssetImage('assets/icon/icon.png'),
                 ),
                 const SizedBox(height: 20),
               ],
